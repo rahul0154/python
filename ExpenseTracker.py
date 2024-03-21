@@ -1,151 +1,167 @@
-'''Design a Python program that helps users keep track of their expenses and manage their budgets.
-Requirements:
-The program should allow users to input their expenses, including the item name and its cost.
-Provide options for the user to add, view, update, or delete expenses.
-Implement error handling to handle invalid inputs or actions gracefully.
-Calculate and display the total expenses incurred.
-Allow users to set a budget and display their remaining budget after deducting their expenses.
-Optionally, provide visualizations such as charts or graphs to represent expense categories or spending trends.'''
-
 import json
-import pandas
+import pandas as pd
+import matplotlib.pyplot as plt
 
-categories = {1: 'Utilities', 2: 'Entertainment', 3: 'Meals', 4: 'Transportation', 5: 'Office Supplies', 6: 'Travel',
-              7: 'Other'}
+categories = {
+    1: 'Utilities', 2: 'Entertainment', 3: 'Meals', 4: 'Transportation', 5: 'Office Supplies', 6: 'Travel',
+    7: 'Other'
+}
 
-def userOptionSelection(options, needValue=False):
-    userMessage = ''
-    for option in options:
-        userMessage += (str(option) + '. ' + options[option]) + '\n'
+
+def user_option_selection(options, need_value=False):
+    user_message = ''
+    for option, description in options.items():
+        user_message += f"{option}. {description}\n"
 
     try:
-        userResponse = int(input(userMessage))
+        user_response = int(input(user_message))
 
-        if options[userResponse] != '':
-            if needValue:
-                return options[userResponse]
+        if options.get(user_response):
+            if need_value:
+                return options[user_response]
             else:
-                return userResponse
-    except:
-        print("Please provide a valid option")
-        return userOptionSelection(options)
+                return user_response
+    except ValueError:
+        print("Please provide a valid option.")
 
-def handleShowExpanse():
+    return user_option_selection(options, need_value)
+
+
+def handle_expense_graph():
     file = open("expanseTracker.json", "r")
-    existingData = file.read()
+    existing_data = file.read()
+    json_data = json.loads(existing_data)
+
+    expenses = {}
+    for expense in json_data:
+        if expense['category'] in expenses:
+            expenses[expense['category']] += float(expense['amount'])
+        else:
+            expenses[expense['category']] = float(expense['amount'])
+
+    plt.pie(expenses.values(), labels=expenses.keys(), autopct='%1.1f%%')
+    plt.show()
+    handle_show_expense()
+
+
+def handle_show_expense():
+    file = open("expanseTracker.json", "r")
+    existing_data = file.read()
     print('============= Expenses =============')
 
-    if existingData != '':
-        jsondata = json.loads(existingData)
-        data = pandas.DataFrame(jsondata)
+    if existing_data != '':
+        json_data = json.loads(existing_data)
+        data = pd.DataFrame(json_data)
         print(data)
         print('====================================')
 
-        print('What you want to do next?')
-        userOptionsMod = {1: "Add Expenses", 2: "Edit", 3: "Delete"}
-        UserInput = userOptionSelection(userOptionsMod)
-        if UserInput == 1:
-            handleAddExpanse()
-        if UserInput == 2 or UserInput == 3:
+        print('What do you want to do next?')
+        user_options_mod = {1: "Add Expenses", 2: "Edit", 3: "Delete", 4: "Show Graph"}
+        user_input = user_option_selection(user_options_mod)
+        if user_input == 1:
+            handle_add_expense()
+        elif user_input == 2 or user_input == 3:
             string = 'Which row would you like to {}? '
-            message = string.format(userOptionsMod[UserInput])
+            message = string.format(user_options_mod[user_input])
 
-            userResponse = int(input(message))
+            user_response = int(input(message))
 
-            if 0 <= userResponse < len(data):
-                if UserInput == 2:
-                    return handleEditExpanse(userResponse)
-                if UserInput == 3:
-                    return handleDeleteExpanse(userResponse)
+            if 0 <= user_response < len(data):
+                if user_input == 2:
+                    return handle_edit_expense(user_response)
+                elif user_input == 3:
+                    return handle_delete_expense(user_response)
             else:
                 print('Please provide valid row key.')
-                return handleShowExpanse()
+                return handle_show_expense()
+        elif user_input == 4:
+            return handle_expense_graph()
+
     else:
         print('No records found.')
         print('====================================')
         print('What you want to do next?')
-        UserInput = userOptionSelection({1: "Add Expenses"})
-        if UserInput == 1:
-            handleAddExpanse()
+        user_input = user_option_selection({1: "Add Expenses"})
+        if user_input == 1:
+            handle_add_expense()
 
-def handleAddExpanse():
+
+def handle_add_expense():
     name = amount = category = ''
 
     try:
         name = input('What did you spent on?\n')
         amount = float(input('Amount\n'))
         print("Select category")
-        category = userOptionSelection(categories, True)
-    except:
+        category = user_option_selection(categories, True)
+    except ValueError:
         print("Please provide a valid data.")
-        handleAddExpanse()
+        handle_add_expense()
 
     try:
-        file = open("expanseTracker.json", "r")
-        existingData = file.read()
-        data = json.loads(existingData)
-    except:
-        data = []
+        with open("expanseTracker.json", "r") as file:
+            existing_data = file.read()
+            data = json.loads(existing_data) if existing_data else []
 
-    try:
         data.append({'name': name, 'amount': amount, 'category': category})
 
-        fileA = open("expanseTracker.json", "w")
-        fileA.write(json.dumps(data))
-        fileA.close()
+        with open("expanseTracker.json", "w") as file:
+            file.write(json.dumps(data))
 
-        print('New expanse added.')
-        handleShowExpanse()
-    except:
-        print('Something went wrong, try again.')
-        handleShowExpanse()
+        print('New expense added.')
+        handle_show_expense()
+    except Exception as e:
+        print(f'Something went wrong: {e}')
+        handle_show_expense()
 
-def handleEditExpanse(rowKey):
-    jsonData = pandas.read_json("expanseTracker.json")
-    data = pandas.DataFrame(jsonData)
+
+def handle_edit_expense(row_key):
+    json_data = pd.read_json("expanseTracker.json")
+    data = pd.DataFrame(json_data)
     name = amount = category = ''
+
     try:
-        name = input('What did you spent on? -> ' + data.loc[rowKey, 'name'] + '\n')
-        amount = float(input('Amount ' + str(data.loc[rowKey, 'amount']) + '\n'))
-        print("Select category -> " + data.loc[rowKey, 'category'] + '\n')
-        category = userOptionSelection(categories, True)
-    except:
+        name = input('What did you spend on? -> ' + data.loc[row_key, 'name'] + '\n')
+        amount = float(input('Amount ' + str(data.loc[row_key, 'amount']) + '\n'))
+        print("Select category -> " + data.loc[row_key, 'category'] + '\n')
+        category = user_option_selection(categories, True)
+    except ValueError:
         print("Please provide a valid data.")
-        handleEditExpanse(rowKey)
+        handle_edit_expense(row_key)
 
     try:
-        data.loc[rowKey, 'name'] = name
-        data.loc[rowKey, 'amount'] = amount
-        data.loc[rowKey, 'category'] = category
+        data.loc[row_key, 'name'] = name
+        data.loc[row_key, 'amount'] = amount
+        data.loc[row_key, 'category'] = category
 
-        fileA = open("expanseTracker.json", "w")
-        fileA.write(data.to_json(orient='records'))
-        fileA.close()
+        with open("expanseTracker.json", "w") as file:
+            file.write(data.to_json(orient='records'))
 
-        print('New expanse added.')
-        handleShowExpanse()
-    except:
-        print('Something went wrong, try again.')
-        handleShowExpanse()
+        print('New expense added.')
+        handle_show_expense()
+    except Exception as e:
+        print(f'Something went wrong: {e}')
+        handle_show_expense()
 
-def handleDeleteExpanse(rowKey):
+
+def handle_delete_expense(row_key):
     try:
-        jsonData = pandas.read_json("expanseTracker.json")
-        data = pandas.DataFrame(jsonData)
+        json_data = pd.read_json("expanseTracker.json")
+        data = pd.DataFrame(json_data)
 
-        data.drop(rowKey, inplace=True)
+        data.drop(row_key, inplace=True)
 
-        fileA = open("expanseTracker.json", "w")
-        fileA.write(data.to_json(orient='records'))
-        fileA.close()
+        with open("expanseTracker.json", "w") as file:
+            file.write(data.to_json(orient='records'))
 
-        print('Expanse deleted.')
-        handleShowExpanse()
-    except:
-        print('Something went wrong, try again.')
-        handleShowExpanse()
+        print('Expense deleted.')
+        handle_show_expense()
+    except Exception as e:
+        print(f'Something went wrong: {e}')
+        handle_show_expense()
+
 
 print("===== WELCOME =====")
 print("Keep track of your expenses and manage budgets.")
 
-handleShowExpanse()
+handle_show_expense()
